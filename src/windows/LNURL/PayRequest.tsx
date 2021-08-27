@@ -41,7 +41,8 @@ export default function LNURLPayRequest({ navigation, route }: IPayRequestProps)
 
   const [metadata, setMetadata] = useState<ILNUrlPayRequestMetadata>();
   const [domain, setDomain] = useState("");
-  const [text, setText] = useState("");
+  const [textPlain, setTextPlain] = useState("");
+  const [textLongDesc, setTextLongDesc] = useState("");
   const [image, setImage] = useState<string | undefined>();
   const [minSpendable, setMinSpendable] = useState<number | undefined>();
   const [maxSpendable, setMaxSpendable] = useState<number | undefined>();
@@ -59,15 +60,22 @@ export default function LNURLPayRequest({ navigation, route }: IPayRequestProps)
       const metadata = JSON.parse(lnUrlObject.metadata) as ILNUrlPayRequestMetadata;
       setMetadata(metadata);
 
-      const metaDataText = metadata.find((m, i) => {
-        return !!m.find((str) => str === "text/plain");
+      const metaDataTextPlain = metadata.find((m, i) => {
+        return m[0].toLowerCase() === "text/plain";
       });
-      if (metaDataText) {
-        setText(metaDataText[1]);
+      if (metaDataTextPlain) {
+        setTextPlain(metaDataTextPlain[1]);
+      }
+
+      const metaDataTextLongDesc = metadata.find((m, i) => {
+        return m[0].toLowerCase() === "text/long-desc";
+      });
+      if (metaDataTextLongDesc) {
+        setTextLongDesc(metaDataTextLongDesc[1]);
       }
 
       const metaDataImage = metadata.filter((m, i) => {
-        return !!m.find((str) => str.toUpperCase().startsWith("IMAGE"));
+        return m[0].toLowerCase().startsWith("image");
       });
       if (metaDataImage[0]) {
         setImage(metaDataImage[0][1]);
@@ -104,6 +112,7 @@ export default function LNURLPayRequest({ navigation, route }: IPayRequestProps)
       const paymentRequestResponse = await doPayRequest({
         msat: sendAmountMSat,
         comment,
+        metadataTextPlain: textPlain,
       });
       console.log(paymentRequestResponse);
       setPayRequestResponse(paymentRequestResponse);
@@ -282,7 +291,7 @@ export default function LNURLPayRequest({ navigation, route }: IPayRequestProps)
                 </Text>
                 <Text style={style.text}>
                   Description:{"\n"}
-                  {text}
+                  {textLongDesc || textPlain}
                 </Text>
                 <Text style={{ marginBottom: 28 }}>
                   Price:{"\n"}

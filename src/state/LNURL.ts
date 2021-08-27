@@ -123,7 +123,7 @@ export interface ILNUrlModel {
   doChannelRequest: Thunk<ILNUrlModel, IDoChannelRequestPayload, IStoreInjections, IStoreModel, Promise<boolean>>;
   doAuthRequest: Thunk<ILNUrlModel, void, IStoreInjections, IStoreModel, Promise<boolean>>;
   doWithdrawRequest: Thunk<ILNUrlModel, { satoshi: number; }, IStoreInjections, IStoreModel, Promise<boolean>>;
-  doPayRequest: Thunk<ILNUrlModel, { msat: number, comment?: string }, IStoreInjections, IStoreModel, Promise<IDoPayRequestResponse>>;
+  doPayRequest: Thunk<ILNUrlModel, { msat: number, comment?: string, metadataTextPlain: string; }, IStoreInjections, IStoreModel, Promise<IDoPayRequestResponse>>;
 
   setLNUrlStr: Action<ILNUrlModel, string>;
   setType: Action<ILNUrlModel, LNURLType>;
@@ -398,6 +398,7 @@ export const lnUrl: ILNUrlModel = {
           paymentRequestStr: response.pr,
           extraData: {
             lnurlPayResponse: response,
+            lnurlPayTextPlain: payload.metadataTextPlain,
             payer: null,
             type: "LNURL",
             website: getDomainFromURL(lnUrlStr),

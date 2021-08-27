@@ -135,6 +135,7 @@ export const webln: IWebLNModel = {
           type: weblnPayment ? "WEBLN" : "NORMAL",
           website: getDomainFromURL(requestUrl),
           lnurlPayResponse: null,
+          lnurlPayTextPlain: null,
         }
       });
 

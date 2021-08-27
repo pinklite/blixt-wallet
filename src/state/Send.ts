@@ -33,6 +33,7 @@ interface IExtraData {
   type: ITransaction["type"];
   website: string | null;
   lnurlPayResponse: ILNUrlPayResponse | null;
+  lnurlPayTextPlain: string | null;
 }
 
 export interface ISendModel {
@@ -160,11 +161,12 @@ export const send: ISendModel = {
       type: "NORMAL",
       website: null,
       lnurlPayResponse: null,
+      lnurlPayTextPlain: null,
     };
 
     const transaction: ITransaction = {
       date: paymentRequest.timestamp,
-      description: paymentRequest.description,
+      description: extraData.lnurlPayTextPlain ?? paymentRequest.description,
       expire: paymentRequest.expiry,
       paymentRequest: paymentRequestStr,
       remotePubkey: paymentRequest.destination,
@@ -284,11 +286,12 @@ export const send: ISendModel = {
       type: "NORMAL",
       website: null,
       lnurlPayResponse: null,
+      lnurlPayTextPlain: null,
     };
 
     const transaction: ITransaction = {
       date: paymentRequest.timestamp,
-      description: paymentRequest.description,
+      description: extraData.lnurlPayTextPlain ?? paymentRequest.description,
       expire: paymentRequest.expiry,
       paymentRequest: paymentRequestStr,
       remotePubkey: paymentRequest.destination,
