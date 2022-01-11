@@ -1,8 +1,5 @@
 package com.blixtwallet;
 
-import com.blixtwallet.tor.BlixtTor;
-import com.blixtwallet.tor.BlixtTorUtils;
-
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.ComponentName;
@@ -53,6 +50,7 @@ public class LndMobileScheduledSyncWorker extends ListenableWorker {
   private ReactDatabaseSupplier dbSupplier;
   private boolean lndStarted = false;
   private boolean torEnabled = false;
+  private int torSocksPort = -1;
   private boolean torStarted = false;
   // Keeps track of how many times we've tried to get info
   // If this keeps going without `syncedToChain` flipping to `true`
@@ -86,11 +84,11 @@ public class LndMobileScheduledSyncWorker extends ListenableWorker {
     writeLastScheduledSyncAttemptToDb();
 
     HyperLog.i(TAG, "MainActivity.started = " + MainActivity.started);
-    if (MainActivity.started) {
-      HyperLog.i(TAG, "MainActivity is started, quitting job");
-      future.set(Result.success());
-      return future;
-    }
+//    if (MainActivity.started) {
+//      HyperLog.i(TAG, "MainActivity is started, quitting job");
+//      future.set(Result.success());
+//      return future;
+//    }
 
     torEnabled = getTorEnabled();
 
@@ -118,13 +116,40 @@ public class LndMobileScheduledSyncWorker extends ListenableWorker {
           HyperLog.d(TAG, "Password retrieved");
 
           if (torEnabled) {
-            boolean startTorResult = startTor();
-            if (!startTorResult) {
-              future.set(Result.failure());
-              return;
-            }
+//            boolean startTorResult = startTor();
+//            if (!startTorResult) {
+//              Log.e(TAG, "Could not start Tor");
+//              future.set(Result.failure());
+//              return;
+//            }
+
+            blixtTor.startTor(new PromiseWrapper() {
+              @Override
+              void onSuccess(@Nullable Object value) {
+                HyperLog.i(TAG, "Tor started");
+                HyperLog.i(TAG, "sockSocksPort: " + (int) value);
+                torStarted = true;
+                torSocksPort = (int) value;
+
+                startLndWorkThread(future, password);
+              }
+
+              @Override
+              void onFail(Throwable throwable) {
+                HyperLog.e(TAG, "Failed to start Tor", throwable);
+                blixtTor.stopTor(new PromiseWrapper() {
+                  @Override
+                  void onSuccess(@Nullable Object value) {}
+
+                  @Override
+                  void onFail(Throwable throwable) {}
+                });
+                future.set(Result.failure());
+              }
+            });
+          } else {
+            startLndWorkThread(future, password);
           }
-          startLndWorkThread(future, password);
         }
       }
 
@@ -293,25 +318,22 @@ public class LndMobileScheduledSyncWorker extends ListenableWorker {
     unbindLndMobileService();
 
     if (torStarted) {
-      if (!MainActivity.started) {
+//      if (!MainActivity.started) {
         HyperLog.i(TAG, "Stopping Tor");
-        // blixtTor.stopTor(new PromiseWrapper() {
-        //   @Override
-        //   void onSuccess(@Nullable Object value) {
-        //     HyperLog.i(TAG, "Tor stopped");
-        //   }
+         blixtTor.stopTor(new PromiseWrapper() {
+           @Override
+           void onSuccess(@Nullable Object value) {
+             HyperLog.i(TAG,"Tor stopped");
+           }
 
-        //   @Override
-        //   void onFail(Throwable throwable) {
-        //     HyperLog.e(TAG, "Fail while stopping Tor", throwable);
-        //   }
-        // });
-        future.set(success ? Result.success() : Result.failure());
-        killLndProcess();
-        return;
-      } else {
-        HyperLog.w(TAG, "MainActivity was started when shutting down sync work. I will not stop Tor");
-      }
+           @Override
+           void onFail(Throwable throwable) {
+             HyperLog.e(TAG, "Fail while stopping Tor", throwable);
+           }
+         });
+//      } else {
+//        HyperLog.w(TAG, "MainActivity was started when shutting down sync work. I will not stop Tor");
+//      }
     }
 
     new Handler().postDelayed(new Runnable() {
@@ -329,18 +351,27 @@ public class LndMobileScheduledSyncWorker extends ListenableWorker {
       @Override
       void onSuccess(@Nullable Object value) {
         HyperLog.i(TAG, "Tor started");
+        HyperLog.i(TAG, "sockSocksPort: " + (int) value);
         torStarted = true;
+        torSocksPort = (int) value;
       }
 
       @Override
       void onFail(Throwable throwable) {
         HyperLog.e(TAG, "Failed to start Tor", throwable);
+        blixtTor.stopTor(new PromiseWrapper() {
+          @Override
+          void onSuccess(@Nullable Object value) {}
+
+          @Override
+          void onFail(Throwable throwable) {}
+        });
         future.set(Result.failure());
       }
     });
     int torTries = 0;
     while (!torStarted) {
-      if (torTries++ > 30) {
+      if (torTries++ > 40) {
         HyperLog.e(TAG, "Couldn't start Tor.");
         future.set(Result.failure());
         return false;
@@ -361,12 +392,8 @@ public class LndMobileScheduledSyncWorker extends ListenableWorker {
     Bundle bundle = new Bundle();
     String params = "--lnddir=" + getApplicationContext().getFilesDir().getPath();
     if (torEnabled) {
-      HyperLog.d(TAG, "Adding Tor params for starting lnd");
-      int socksPort = BlixtTorUtils.getSocksPort();
-      int controlPort = BlixtTorUtils.getControlPort();
-      params += " --tor.active --tor.socks=127.0.0.1:" + socksPort + " --tor.control=127.0.0.1:" + controlPort;
-      // params += " --tor.v3 --listen=localhost";
-      params += " --nolisten";
+      HyperLog.d(TAG, "Adding Tor params for starting lnd, torSocksPort: " + torSocksPort);
+      params += " --tor.active --tor.socks=127.0.0.1:" + torSocksPort;
     }
     else {
       // If Tor isn't active, make sure we aren't
